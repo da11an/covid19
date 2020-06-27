@@ -16,6 +16,7 @@ library(here)
 library(RcppRoll)
 library(ggplot2)
 library(ggrepel)
+library(plotly)
 
 # download data (if needed) and load ----
 jhdata <- "https://github.com/CSSEGISandData/COVID-19/raw/master/csse_covid_19_data/csse_covid_19_time_series/"
@@ -155,7 +156,7 @@ ui <- fluidPage(
     uiOutput('header_local'),
     plotOutput('plot_local'),
     uiOutput('header_state'),
-    plotOutput('plot_state')
+    uiOutput('plot_state')
   ),
   helpText(tags$a(href = 'https://github.com/CSSEGISandData/COVID-19', 
                   'Data source: COVID-19 Data Repository by the Center for Systems Science and Engineering (CSSE) at Johns Hopkins University'))
@@ -248,28 +249,55 @@ server <- function(input, output) {
     return(p)
   })
   
-  output$plot_state <- renderPlot({ # state plot ----
+  output$plot_state <- renderUI({ # state plot ----
     req(isTruthy(input$combined_key))
-    p <-
-      state_data() %>%
-      ggplot(aes(date, value, col = State, label = my_label)) +
-      facet_wrap(vars(statistic),
-                 scales = "free_y",
-                 labeller = labeller(statistic = simple_cap)) +
-      geom_point() +
-      geom_text_repel(nudge_x = 0.3*as.numeric(diff(range(state_data()$date)))) +
-      theme_bw(base_size = 16) +
-      theme(legend.position="none") +
-      xlab(NULL) + ylab(NULL) +
-      xlim(c(state_data()$date[1],
-             state_data()$date[1] + 
-               1.3*diff(range(state_data()$date))))
     
-    if (input$trendline) {
-      p <- p + stat_smooth(se = input$se, span = input$span)
-    }
+    lapply(
+      state_column_list(),
+      function(my_stat) {
+        p <-
+          state_data() %>%
+          filter(statistic == my_stat) %T>% print %>%
+          ggplot(aes(date, value, col = State, label = my_label)) +
+          # facet_wrap(vars(statistic),
+          #            scales = "free_y",
+          #            labeller = labeller(statistic = simple_cap)) +
+          geom_point() +
+          geom_text_repel(nudge_x = 0.3*as.numeric(diff(range(state_data()$date)))) +
+          theme_bw(base_size = 16) +
+          theme(legend.position="none") +
+          xlab(NULL) + ylab(NULL) +
+          xlim(c(state_data()$date[1],
+                 state_data()$date[1] + 
+                   1.3*diff(range(state_data()$date))))
+        
+        if (input$trendline) {
+          p <- p + stat_smooth(se = input$se, span = input$span)
+        }
+        return( column(width = 12/length(stat_list()), tagList(h4(simple_cap(my_stat)), renderPlotly(ggplotly(p)))) )
+      }
+    )
     
-    return(p)
+    # p <-
+    #   state_data() %>%
+    #   ggplot(aes(date, value, col = State, label = my_label)) +
+    #   facet_wrap(vars(statistic),
+    #              scales = "free_y",
+    #              labeller = labeller(statistic = simple_cap)) +
+    #   geom_point() +
+    #   geom_text_repel(nudge_x = 0.3*as.numeric(diff(range(state_data()$date)))) +
+    #   theme_bw(base_size = 16) +
+    #   theme(legend.position="none") +
+    #   xlab(NULL) + ylab(NULL) +
+    #   xlim(c(state_data()$date[1],
+    #          state_data()$date[1] + 
+    #            1.3*diff(range(state_data()$date))))
+    # 
+    # if (input$trendline) {
+    #   p <- p + stat_smooth(se = input$se, span = input$span)
+    # }
+    
+    # return(p)
     
   })
 }
